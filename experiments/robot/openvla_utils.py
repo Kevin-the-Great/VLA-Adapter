@@ -298,14 +298,23 @@ def get_vla(cfg: Any) -> torch.nn.Module:
         check_model_logic_mismatch(cfg.pretrained_checkpoint)
 
     # Load the model
+    use_quantization = cfg.load_in_8bit or cfg.load_in_4bit
+    if use_quantization and not torch.cuda.is_available():
+        raise RuntimeError("8-bit/4-bit quantization requires CUDA; no GPU detected.")
+    if use_quantization:
+        device_map = {"": 0}
+    else:
+        device_map = None
+    low_cpu_mem_usage = True if use_quantization else False
     vla = AutoModelForVision2Seq.from_pretrained(
         cfg.pretrained_checkpoint,
         # attn_implementation="flash_attention_2",
         torch_dtype=torch.bfloat16,
         load_in_8bit=cfg.load_in_8bit,
         load_in_4bit=cfg.load_in_4bit,
-        low_cpu_mem_usage=False,
+        low_cpu_mem_usage=low_cpu_mem_usage,
         trust_remote_code=False,
+        device_map=device_map,
     )
 
     # If using FiLM, wrap the vision backbone to allow for infusion of language inputs
